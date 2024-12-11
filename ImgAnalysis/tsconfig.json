@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
-    /* Visit https://aka.ms/tsconfig to read more about this file */
-
-    "target": "es2016",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-    "module": "commonjs",                                /* Specify what module code is generated. */                                    /* Specify a set of entries that re-map imports to additional lookup locations. */
-    "rootDirs": [],                                   /* Allow multiple folders to be treated as one when resolving modules. */
-    "outDir": "./JavaScript",                                   /* Specify an output folder for all emitted files. */
-    "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
-    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
-    "strict": true,                                      /* Enable all strict type-checking options. */
-    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
-  }
+    "target": "ES6",                  // Target ES6 or newer
+    "module": "esnext",               // Use ES Modules
+    "outDir": "./dist",               // Output compiled JS files to ./dist
+    "rootDir": ".",                   // Root directory for TypeScript source files
+    "moduleResolution": "node",       // Resolve modules like Node.js
+    "esModuleInterop": true,
+    "allowJs": true,          // Ensure interop with CommonJS modules
+  },
+  "include": ["./path_creator/**/*.ts"], // Include both directories
+  "exclude": ["node_modules"]         // Exclude dependencies
 }
