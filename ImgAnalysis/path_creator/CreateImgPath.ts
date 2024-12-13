@@ -95,7 +95,7 @@ function applyBlur (img, radius) {
 	}
 	ctx.putImageData(imageData, 0, 0);
 }
-
+//https://github.com/mdn/dom-examples/blob/main/canvas/pixel-manipulation/color-manipulation.js
 function applyConvolution(surrounding_pixels: Array<Array<number>>, conv_array) {
     if (surrounding_pixels.length != conv_array.length) throw Error("convolutional array must be the same size as the surrounding pixels")
 
