@@ -57,7 +57,7 @@ function getSurroundingPixels(pixel_index: number, pixels_array: Array<Array<num
     var [row, column] = [Math.floor(pixel_index / width), pixel_index % width] 
     // console.log(row, "| act", height)
     if ((column < radius || width - column < radius) || (row < radius || (height-1) - row <= radius)) {
-        console.log("pixel is on edge, ignoring and returning " + pixels_array[pixel_index])
+        // console.log("pixel is on edge, ignoring and returning " + pixels_array[pixel_index])
         surrounding_pixels.fill(pixels_array[pixel_index])
         return (surrounding_pixels) // if pixel is edge pixel, ignore
     }
@@ -113,12 +113,29 @@ function applyContrastFilter(surrounding_pixels: Array<Array<number>>) {
     });
     avg_contrast *= 1 / surrounding_pixels.length
 
-    var contrast_pix = new Array(4).fill(255/2 * avg_contrast + 255/2)
+    var contrast_pix = new Array(4).fill(255 * avg_contrast)
 
     return contrast_pix
 }
 
-function main(img, index) {
+function getContrastPoints(surrounding_pixels, threshold) {
+    var main_pixel = surrounding_pixels[Math.floor(surrounding_pixels.length/2)] 
+    surrounding_pixels.splice(Math.floor(surrounding_pixels.length/2))
+
+    var avg_contrast = 0
+    surrounding_pixels.forEach(pixel => {
+        avg_contrast += contrast(main_pixel, pixel)
+    });
+    avg_contrast *= 1 / surrounding_pixels.length
+
+    if (avg_contrast > threshold) {
+        return new Array(4).fill(100)
+    } else {
+        return new Array(4).fill(255)
+    }
+}
+
+function main(img, threshold) {
 
     // getting pixel array of jpg img
     const jpg_data = decodeJPG(img)
@@ -137,6 +154,7 @@ function main(img, index) {
 
     var convolved_img_pixels = []
     var contrast_img_pixels = []
+    var contrast_points = []
     for (var i = 0; i < grouped_img_pixels.length; i++) {
     // var i = 430982
         var surrounding_pixels = getSurroundingPixels(i, grouped_img_pixels, jpg_data.width, jpg_data.height, convolutional_array)
@@ -145,6 +163,8 @@ function main(img, index) {
         convolved_img_pixels.push(deconvolved_pix)
         var contrast_pix = applyContrastFilter(surrounding_pixels)
         contrast_img_pixels.push(contrast_pix)
+        var contrast_point = getContrastPoints(surrounding_pixels, threshold)
+        contrast_points.push(contrast_point)
     }
 
     // console.log(final_img_pixels)
@@ -153,23 +173,25 @@ function main(img, index) {
     Visualize2D.workspace.appendChild(conv_canvas)
     const constrast_canvas = createCanvasFromRGBAData(contrast_img_pixels, jpg_data.width, jpg_data.height) //
     Visualize2D.workspace.appendChild(constrast_canvas)
-
+    console.log(contrast_points)
+    const points_canvas = createCanvasFromRGBAData(contrast_points, jpg_data.width, jpg_data.height) //
+    Visualize2D.workspace.appendChild(points_canvas)
 }
 
 
 const Testing = (runtimeVars, time) => {
-    var [index] = runtimeVars
+    var [contrast_threshold] = runtimeVars
     Visualize2D.SetWorkspace()
 
     const img = htmlImg("./training_sample/coke2.jpg")
-    img.onload = () => {main(img, index)}
+    img.onload = () => {main(img, contrast_threshold / 1000)}
 
 }
 
 Visualize2D.SetWorkspace()
 const runtime = new Visualize2D.Runtime(Testing)        // init Runtime
 runtime.CreateTicker(Visualize2D.DefaultTicker)
-runtime.varNumber("index", 0, 10000)   // set desired vars
+runtime.varNumber("contrast_threshold", 0, 1000)   // set desired vars
 runtime.UpdateScreen(0)
 
 
