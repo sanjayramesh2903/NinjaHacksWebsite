@@ -1,4 +1,9 @@
+import { isAnyArrayBuffer } from "util/types"
 import * as Visualize2D from "./visualize2d_scripts.js"
+
+const BLACK = new Array(4).fill(0)
+const WHITE = new Array(4).fill(255)
+const GREY = new Array(4).fill(255/2)
 
 const htmlImg = (jpg_path: string) => {
 
@@ -27,7 +32,7 @@ const decodeJPG = (img: HTMLImageElement) => {
 
 }
 
-function createCanvasFromRGBAData(data: Array<Array<number>>, width: number, height: number) {
+function createCanvasFromRGBAData(data, width: number, height: number) {
     if(width*height !== data.length) throw new Error("width*height should equal data.length");
     let canvas = document.createElement("canvas");
     canvas.width = width;
@@ -72,6 +77,23 @@ function getSurroundingPixels(pixel_index: number, pixels_array: Array<Array<num
     }
 
     return surrounding_pixels
+}
+
+function applyBlur (img, radius) {
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+
+    ctx.drawImage(img, 0, 0);
+	const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+	const data = imageData.data;
+	for (var i = 0; i < data.length; i += 4) {
+		let red = data[i], green = data[i + 1], blue = data[i + 2];
+
+		data[i] = Math.min(Math.round(0.393 * red + 0.769 * green + 0.189 * blue), 255);
+		data[i + 1] = Math.min(Math.round(0.349 * red + 0.686 * green + 0.168 * blue), 255);
+		data[i + 2] = Math.min(Math.round(0.272 * red + 0.534 * green + 0.131 * blue), 255);
+	}
+	ctx.putImageData(imageData, 0, 0);
 }
 
 function applyConvolution(surrounding_pixels: Array<Array<number>>, conv_array) {
@@ -129,9 +151,9 @@ function getContrastPoints(surrounding_pixels, threshold) {
     avg_contrast *= 1 / surrounding_pixels.length
 
     if (avg_contrast > threshold) {
-        return new Array(4).fill(100)
+        return [BLACK, true]
     } else {
-        return new Array(4).fill(255)
+        return [GREY, false]
     }
 }
 
@@ -139,8 +161,8 @@ function main(img, threshold) {
 
     // getting pixel array of jpg img
     const jpg_data = decodeJPG(img)
-    var img_pixels = Array.from(jpg_data.data)
-    var grouped_img_pixels = reshape(img_pixels, jpg_data.height * jpg_data.width, 4)
+    // var img_pixels = Array.from(jpg_data.data)
+    var grouped_img_pixels = reshape(jpg_data.data, jpg_data.height * jpg_data.width, 4)
 
     // do stuff to pixel array
     // console.log(grouped_img_pixels)
@@ -150,11 +172,12 @@ function main(img, threshold) {
     //     100,10,100,
     //     1,1,1
     // ]
-    const convolutional_array = new Array(7**2).fill(1)
+    const convolutional_array = new Array(11**2).fill(1)
 
     var convolved_img_pixels = []
     var contrast_img_pixels = []
     var contrast_points = []
+    var count = 0
     for (var i = 0; i < grouped_img_pixels.length; i++) {
     // var i = 430982
         var surrounding_pixels = getSurroundingPixels(i, grouped_img_pixels, jpg_data.width, jpg_data.height, convolutional_array)
@@ -163,8 +186,10 @@ function main(img, threshold) {
         convolved_img_pixels.push(deconvolved_pix)
         var contrast_pix = applyContrastFilter(surrounding_pixels)
         contrast_img_pixels.push(contrast_pix)
-        var contrast_point = getContrastPoints(surrounding_pixels, threshold)
-        contrast_points.push(contrast_point)
+        var [contrast_point, isPoint] = getContrastPoints(surrounding_pixels, threshold)
+
+        isPoint ? count = 3 : count--
+        count == 0 ? contrast_points.push(contrast_point) : contrast_points.push(BLACK)
     }
 
     // console.log(final_img_pixels)
@@ -179,17 +204,19 @@ function main(img, threshold) {
 }
 
 
-const Testing = (runtimeVars, time) => {
+const visualizeConnection = (runtimeVars, time) => {
     var [contrast_threshold] = runtimeVars
     Visualize2D.SetWorkspace()
 
-    const img = htmlImg("./training_sample/coke2.jpg")
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = '../training_sample/coke1.jpg';
     img.onload = () => {main(img, contrast_threshold / 1000)}
 
 }
 
 Visualize2D.SetWorkspace()
-const runtime = new Visualize2D.Runtime(Testing)        // init Runtime
+const runtime = new Visualize2D.Runtime(visualizeConnection)        // init Runtime
 runtime.CreateTicker(Visualize2D.DefaultTicker)
 runtime.varNumber("contrast_threshold", 0, 1000)   // set desired vars
 runtime.UpdateScreen(0)
@@ -199,7 +226,7 @@ runtime.UpdateScreen(0)
 // GENERAL FUNCTIONS
 
 
-function reshape(array: Array<any>, rows: number, cols: number): Array<Array<any>> {
+function reshape(array, rows: number, cols: number): Array<Array<any>> {
     if (rows * cols !== array.length) {
       throw new Error("Invalid dimensions for reshape");
     }
