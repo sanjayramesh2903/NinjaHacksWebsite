@@ -8,6 +8,6 @@
     "esModuleInterop": true,
     "allowJs": true,          // Ensure interop with CommonJS modules
   },
-  "include": ["./path_creator/**/*.ts"], // Include both directories
+  "include": ["./path_creator/**/*.ts", "./index.ts"], // Include both directories
   "exclude": ["node_modules"]         // Exclude dependencies
 }
