@@ -11,8 +11,8 @@ blur_button.innerHTML = "BLUR"
 root.appendChild(blur_button)
 
 
-var eimg1 = new ImgPath.EulerImg("./training_sample/coke1.jpg", root, 3) 
-var eimg2 = new ImgPath.EulerImg("./training_sample/coke8.jpg", root, 3) 
+var eimg1 = new ImgPath.EulerImg("./training/toothbrush/toothbrush2.jpg", 3, root) 
+var eimg2 = new ImgPath.EulerImg("./training_sample/coke3.jpg", 3, root) 
 
 const KP_button_1 = document.createElement("button")
 KP_button_1.innerHTML = "KeyPoints1"
@@ -33,10 +33,11 @@ function main(runtimeVars, time) {
 
     const bothImgKeyPoints = []
 
-    const handleClick1 = (eimg) => {
+    const handleClick1 = (eimg: ImgPath.EulerImg) => {
         var keyPoints = eimg.keyPointDetection(10, contrast_threshold, true, true, false)
+        eimg.normalizeKeyPoints
+        console.log(`${eimg.keyPoints}`)
         bothImgKeyPoints.push(keyPoints)
-        console.log(keyPoints)
 
         const canvas: HTMLCanvasElement = document.createElement("canvas")
         root.appendChild(canvas)
@@ -68,7 +69,6 @@ function main(runtimeVars, time) {
         const f = (x) => {return x}
         keyPoints = keyPoints.map(elem => { return [f(elem[0]), f(elem[1])] })
         bothImgKeyPoints.push(keyPoints)
-        console.log(keyPoints)
 
         const canvas: HTMLCanvasElement = document.createElement("canvas")
         root.appendChild(canvas)
@@ -102,7 +102,7 @@ function main(runtimeVars, time) {
     }
 
     compare_button.onclick = () => {
-        eimg1.optimizeTransformation(eimg2.keyPoints)
+        ImgPath.getSimilarityScore(eimg1.keyPoints, eimg2.keyPoints)
     }
 }
 
@@ -111,3 +111,33 @@ const runtime = new Visualize2D.Runtime(main)        // init Runtime
 runtime.CreateTicker(Visualize2D.DefaultTicker)
 runtime.varNumber("contrast_threshold", 0, 16)   // set desired vars
 runtime.UpdateScreen(0)
+
+
+var json = {};
+
+var files = [
+    "./training/toothbrush/toothbrush1.jpg",
+]
+
+const gj = document.getElementById("gj")
+gj.onclick = generateJSON
+
+function generateJSON() {
+    // files.forEach(function (file) {
+        var eimg = new ImgPath.EulerImg("./training/toothbrush/toothbrush2.jpg", 3, root);
+        for (var i = 0; i < 8; i++){
+            eimg.gaussianBlur();
+        }
+        eimg.keyPointDetection(10, 8, true, false, false);
+        eimg.normalizeKeyPoints;
+        var keyPoints = eimg.keyPoints;
+        json["./training/toothbrush/toothbrush2.jpg"] = keyPoints;
+    // });
+    
+    const jsonString = JSON.stringify(json, null, 2)
+    
+    const p = document.createElement("p")
+    p.innerHTML = jsonString
+    root.appendChild(p)
+
+}

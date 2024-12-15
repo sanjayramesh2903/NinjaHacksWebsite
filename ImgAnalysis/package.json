@@ -3,6 +3,7 @@
     "@tensorflow/tfjs": "^4.22.0",
     "@types/concaveman": "^1.1.6",
     "concaveman": "^1.2.1",
+    "fs": "^0.0.1-security",
     "jpeg-js": "^0.4.4",
     "mathjs": "^14.0.1",
     "typescript": "^5.7.2"

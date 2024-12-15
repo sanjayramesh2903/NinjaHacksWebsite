@@ -1,23 +1,15 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+// @ts-ignore
 import concaveman from "https://cdn.skypack.dev/concaveman";
 // import * as tf from "@tensorflow/tfjs"
 export class EulerImg {
-    constructor(img_path, root, sigmaForGuassianBlur) {
+    constructor(img_path, sigmaForGuassianBlur, root) {
         this.img = new Image();
         this.img.crossOrigin = 'anonymous';
         this.img.src = img_path;
         this.canvas = document.createElement('canvas');
         this.canvas.id = "EulerCanvas";
         this.ctx = this.canvas.getContext('2d');
-        root.appendChild(this.canvas);
+        root != undefined ? root.appendChild(this.canvas) : null;
         this.img.onload = () => {
             this.canvas.width = this.img.width;
             this.canvas.height = this.img.height;
@@ -103,6 +95,7 @@ export class EulerImg {
         const width = imageData.width;
         const height = imageData.height;
         const data = imageData.data;
+        console.log(data);
         // Compute gradients (Sobel operator)
         const gradients = computeGradients(data, width, height);
         // for pixels, if contrast gradient is below thresh ignore
@@ -117,7 +110,6 @@ export class EulerImg {
         }
         if (outermostPoints) {
             this.keyPoints = concaveman(this.keyPoints);
-            console.log(this.keyPoints, "after jarvis");
         }
         if (updateImg) {
             var radius = 2;
@@ -159,57 +151,81 @@ export class EulerImg {
         console.log("Key points obtained!");
         return this.keyPoints;
     }
-    optimizeTransformation(keyPointsToMap) {
-        // this.keypoints stays constant, spits out transformation vars for the keypointstomap
-        const Y = tf.tensor(this.keyPoints); // Tensor of size n x 2
-        const X = tf.tensor(keyPointsToMap); // Tensor of size n x 2
-        const scale = tf.variable(tf.scalar(Math.random()));
-        const theta = tf.variable(tf.scalar(Math.random()));
-        const translation = tf.variable(tf.randomUniform([1, 2])); // Tensor of size 1 x 2
-        const transformX = (X) => {
-            const cosTheta = tf.cos(theta);
-            const sinTheta = tf.sin(theta);
-            const rotation = tf.stack([
-                tf.concat([cosTheta, tf.neg(sinTheta)], 0),
-                tf.concat([sinTheta, cosTheta], 0)
-            ]);
-            const scaledRotated = tf.matMul(X, rotation).mul(scale);
-            const tiledTranslation = translation.tile([X.shape[0], 1]);
-            return scaledRotated.add(tiledTranslation);
-        };
-        const optimizer = tf.train.adam(0.01);
-        function optimize() {
-            return __awaiter(this, void 0, void 0, function* () {
-                for (let i = 0; i < 100; i++) {
-                    optimizer.minimize(() => {
-                        const X_prime = transformX(X);
-                        return HausdorffDistance(X_prime, Y);
-                    });
-                    console.log(`Iteration ${i + 1}`);
-                    console.log('Scale:', scale.dataSync(), 'Theta:', theta.dataSync(), 'Translation:', translation.dataSync());
-                }
-            });
-        }
-        optimize().then(() => {
-            console.log('Optimization complete');
-            console.log('Final Scale:', scale.dataSync());
-            console.log('Final Theta:', theta.dataSync());
-            console.log('Final Translation:', translation.dataSync());
+    normalizeKeyPoints() {
+        const Y_x_rang = [Infinity, -Infinity];
+        const Y_y_rang = [Infinity, -Infinity];
+        this.keyPoints.forEach(point => {
+            point[0] > Y_x_rang[1] ? Y_x_rang[1] = point[0] : null;
+            point[0] < Y_x_rang[0] ? Y_x_rang[0] = point[0] : null;
+            point[1] > Y_y_rang[1] ? Y_y_rang[1] = point[1] : null;
+            point[1] < Y_y_rang[0] ? Y_y_rang[0] = point[1] : null;
         });
+        this.keyPoints = this.keyPoints.map(point => { return [point[0] - Y_x_rang[0], point[1] - Y_y_rang[0]]; });
     }
 }
+export function getSimilarityScore(X, basepoints) {
+    // normalize key points
+    const Y_x_rang = [Infinity, -Infinity];
+    const Y_y_rang = [Infinity, -Infinity];
+    basepoints.forEach(point => {
+        point[0] > Y_x_rang[1] ? Y_x_rang[1] = point[0] : null;
+        point[0] < Y_x_rang[0] ? Y_x_rang[0] = point[0] : null;
+        point[1] > Y_y_rang[1] ? Y_y_rang[1] = point[1] : null;
+        point[1] < Y_y_rang[0] ? Y_y_rang[0] = point[1] : null;
+    });
+    const X_x_rang = [Infinity, -Infinity];
+    const X_y_rang = [Infinity, -Infinity];
+    X.forEach(point => {
+        point[0] > X_x_rang[1] ? X_x_rang[1] = point[0] : null;
+        point[0] < X_x_rang[0] ? X_x_rang[0] = point[0] : null;
+        point[1] > X_y_rang[1] ? X_y_rang[1] = point[1] : null;
+        point[1] < X_y_rang[0] ? X_y_rang[0] = point[1] : null;
+    });
+    X = X.map(point => {
+        const scale = (Y_x_rang[1] - Y_x_rang[0]) / (X_x_rang[1] - X_x_rang[0]); // scale so x ranges of both sets are equal
+        return [(point[0] - X_x_rang[0]) * scale, (point[1] - X_y_rang[0]) * scale];
+    });
+    const hd = hausdorffDistance(X, basepoints);
+    const avg_range = ((X_x_rang[1] - X_x_rang[0]) + (X_y_rang[1] - X_y_rang[0]) + (Y_x_rang[1] - Y_x_rang[0]) + (Y_y_rang[1] - Y_y_rang[0])) / 4;
+    var score = hd;
+    console.log(score);
+}
 //  Hausdorff distance for similarity scorer
-const HausdorffDistance = (points1, points2) => {
-    const dist1 = directedHausdorff(points1, points2);
-    const dist2 = directedHausdorff(points2, points1);
-    return tf.max(tf.concat([dist1, dist2]));
-};
-const directedHausdorff = (set1, set2) => {
-    const expandedSet1 = tf.expandDims(set1, 1); // shape: [n1, 1, 2]
-    const expandedSet2 = tf.expandDims(set2, 0); // shape: [1, n2, 2]
-    const pairwiseDistances = tf.sqrt(tf.sum(tf.square(tf.sub(expandedSet1, expandedSet2)), 2)); // shape: [n1, n2]
-    return tf.max(tf.min(pairwiseDistances, 1)); // Min distance per point in set1, then max of those.
-};
+function hausdorffDistance(setA, setB) {
+    function directedHausdorff(set1, set2) {
+        let maxDist = 0;
+        for (let pointA of set1) {
+            let minDist = Infinity;
+            for (let pointB of set2) {
+                let dist = Math.sqrt(Math.pow((pointA[0] - pointB[0]), 2) + Math.pow((pointA[1] - pointB[1]), 2));
+                minDist = Math.min(minDist, dist);
+            }
+            maxDist = Math.max(maxDist, minDist);
+        }
+        return maxDist;
+    }
+    return Math.max(directedHausdorff(setA, setB), directedHausdorff(setB, setA));
+}
+// ATTEMPT AT CREATING TENSORFLOW HAUSDORFF DISTANCE
+// //  Hausdorff distance for similarity scorer
+// const HausdorffDistance = (points1: tf.Tensor, points2: tf.Tensor) => {
+//     const dist1 = directedHausdorff(points1, points2);
+//     // console.log("dist1: "+ dist1.shape)
+//     const dist2 = directedHausdorff(points2, points1);
+//     // console.log("dist2: "+ dist2.shape)
+//     return tf.max(tf.concat([dist1, dist2], 0));
+// };
+// const directedHausdorff = (set1: tf.Tensor, set2: tf.Tensor) => {
+//     const set1Expanded = set1.expandDims(1); // Shape: [n, 1, 2]
+//     const set2Expanded = set2.expandDims(0); // Shape: [1, m, 2]
+//     const pairwiseDiff = tf.sub(set1Expanded, set2Expanded); // Shape: [n, m, 2]
+//     const pairwiseDistances = tf.sqrt(tf.sum(tf.square(pairwiseDiff), 2)); // Shape: [n, m]
+//     const minDistances = tf.min(pairwiseDistances, 1); // Minimum distance for each point in set1
+//     // console.log("\tmiddists: "+ minDistances)
+//     const u = tf.max(minDistances)
+//         // console.log( "\tdirect haus = " + u)
+//     return u.reshape([-1]); // Maximum of minimum distances
+// };
 // GAUSSIAN BLUR FUNCTIONS
 function generateGaussianKernel(sigma, radius) {
     const kernel = [];
